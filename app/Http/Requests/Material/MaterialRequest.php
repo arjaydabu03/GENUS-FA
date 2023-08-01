@@ -24,35 +24,32 @@ class MaterialRequest extends FormRequest
     public function rules()
     {
         return [
-            'code'=> [
-                'required',
-                'string',
+            "code" => [
+                "required",
+                "string",
                 $this->route()->material
-                    ? 'unique:materials,code,'.$this->route()->material
-                    : 'unique:materials,code'
+                    ? "unique:materials,code," . $this->route()->material
+                    : "unique:materials,code",
             ],
-            'name'=>'required|string',
-            'category_id'=>'required|exists:categories,id,deleted_at,NULL',
-            'uom_id'=>'required|exists:uom,id,deleted_at,NULL',
-            'warehouse_id'=>'required|exists:warehouse,id,deleted_at,NULL'
+            "name" => "required|string",
+            "category_id" => "required|exists:categories,id,deleted_at,NULL",
+            "uom_id" => "required|exists:uom,id,deleted_at,NULL",
+            "additional_desc" => "required",
         ];
     }
 
     public function attributes()
     {
-       return [
+        return [
             "category_id" => "category",
             "uom_id" => "uom",
-            "warehouse_id" => "warehouse"
-
-       ];
+        ];
     }
 
     public function messages()
     {
         return [
-          
-            "exists"  =>  ":Attribute is not registered.",
+            "exists" => ":Attribute is not registered.",
         ];
     }
 }

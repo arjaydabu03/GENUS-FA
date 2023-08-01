@@ -36,19 +36,27 @@ class ApproverController extends Controller
             ->with("scope_approval")
             ->first()
             ->scope_approval->pluck("location_id");
-            
+
+        $user_scope_code = User::where("id", Auth::id())
+            ->with("scope_approval")
+            ->first()
+            ->scope_approval->pluck("location_code");
+
         $approver_id = User::where("id", Auth::id())->pluck("id");
 
         $order = Transaction::with("orders")
-            ->where(function ($query) use ($user_scope) {
-                $query->whereIn("department_id", $user_scope)->whereNot("requestor_id", Auth::id());
+            ->where(function ($query) use ($user_scope, $user_scope_code) {
+                $query
+                    ->whereIn("customer_id", $user_scope)
+                    ->whereIn("customer_code", $user_scope_code)
+                    ->whereNot("requestor_id", Auth::id());
             })
 
             ->where(function ($query) use ($search) {
                 $query
                     ->where("date_ordered", "like", "%" . $search . "%")
-                    ->orWhere("order_no", "like", "%" . $search . "%")
-                    ->orWhere("date_needed", "like", "%" . $search . "%")
+                    ->orWhere("keyword_code", "like", "%" . $search . "%")
+                    ->orWhere("keyword_name", "like", "%" . $search . "%")
                     ->orWhere("date_approved", "like", "%" . $search . "%")
                     ->orWhere("company_name", "like", "%" . $search . "%")
                     ->orWhere("department_name", "like", "%" . $search . "%")
@@ -75,10 +83,10 @@ class ApproverController extends Controller
             ->when($status === "disapprove", function ($query) use ($approver_id) {
                 $query
                     ->whereNotNull("date_approved")
-                    ->where("approver_id",$approver_id)
+                    ->where("approver_id", $approver_id)
                     ->onlyTrashed();
             })
-          ->when($status === "all", function ($query) use ($approver_id) {
+            ->when($status === "all", function ($query) use ($approver_id) {
                 $query->where("approver_id", $approver_id)->withTrashed();
             })
             ->orderByRaw("CASE WHEN rush IS NULL AND date_approved IS NULL THEN 0 ELSE 1 END DESC")
@@ -97,18 +105,24 @@ class ApproverController extends Controller
     public function update(Request $request, $id)
     {
         $user = Auth()->user();
+
         $user_scope = User::where("id", $user->id)
             ->with("scope_approval")
             ->first()
             ->scope_approval->pluck("location_id");
 
-        $time_now = Carbon::now()
-            ->timezone("Asia/Manila")
-            ->format("H:i");
-        $date_today = Carbon::now()
-            ->timeZone("Asia/Manila")
-            ->format("Y-m-d");
-        $cutoff = date("H:i", strtotime(Cutoff::get()->value("time")));
+        $user_scope_code = User::where("id", $user->id)
+            ->with("scope_approval")
+            ->first()
+            ->scope_approval->pluck("location_code");
+
+        // $time_now = Carbon::now()
+        //     ->timezone("Asia/Manila")
+        //     ->format("H:i");
+        // $date_today = Carbon::now()
+        //     ->timeZone("Asia/Manila")
+        //     ->format("Y-m-d");
+        // $cutoff = date("H:i", strtotime(Cutoff::get()->value("time")));
 
         $transaction = Transaction::where("id", $id);
 
@@ -117,22 +131,25 @@ class ApproverController extends Controller
             return GlobalFunction::denied(Status::NOT_FOUND);
         }
 
-        $not_allowed = $transaction->whereIn("department_id", $user_scope)->get();
+        $not_allowed = $transaction
+            ->whereIn("customer_id", $user_scope)
+            ->whereIn("customer_code", $user_scope_code)
+            ->get();
         if ($not_allowed->isEmpty()) {
             return GlobalFunction::denied(Status::ACCESS_DENIED);
         }
 
-        $is_rush = Transaction::where("id", $id)
-            ->whereNotNull("rush")
-            ->whereDate("date_needed", $date_today)
-            ->count();
-        $is_advance = Transaction::where("id", $id)
-            ->where("date_needed", ">", $date_today)
-            ->count();
+        // $is_rush = Transaction::where("id", $id)
+        //     ->whereNotNull("rush")
+        //     ->whereDate("date_needed", $date_today)
+        //     ->count();
+        // $is_advance = Transaction::where("id", $id)
+        //     ->where("date_needed", ">", $date_today)
+        //     ->count();
 
-        if ($time_now > $cutoff && !$is_rush && !$is_advance) {
-            return GlobalFunction::denied(Status::CUT_OFF);
-        }
+        // if ($time_now > $cutoff && !$is_rush && !$is_advance) {
+        //     return GlobalFunction::denied(Status::CUT_OFF);
+        // }
 
         $transaction->update([
             "approver_id" => $user->id,
@@ -185,8 +202,6 @@ class ApproverController extends Controller
             ->with("scope_approval")
             ->first()
             ->scope_approval->pluck("location_id");
-            
-     
 
         $pending = Transaction::whereNull("date_approved")
             ->whereNot("requestor_id", Auth::id())
@@ -196,12 +211,8 @@ class ApproverController extends Controller
             ->get()
             ->count();
 
-      
-
         $count = [
-           
             "pending" => $pending,
-           
         ];
 
         return GlobalFunction::response_function(Status::COUNT_DISPLAY, $count);

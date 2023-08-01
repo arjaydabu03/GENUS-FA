@@ -20,6 +20,7 @@ use App\Models\Cutoff;
 
 use App\Functions\GlobalFunction;
 use App\Functions\SmsFunction;
+use App\Functions\SmsFunctionHri;
 
 use App\Response\Status;
 use App\Http\Requests\Order\StoreRequest;
@@ -43,8 +44,8 @@ class OrderController extends Controller
             ->where(function ($query) use ($search) {
                 $query
                     ->where("date_ordered", "like", "%" . $search . "%")
-                    ->orWhere("order_no", "like", "%" . $search . "%")
-                    ->orWhere("date_needed", "like", "%" . $search . "%")
+                    ->orWhere("keyword_code", "like", "%" . $search . "%")
+                    ->orWhere("keyword_name", "like", "%" . $search . "%")
                     ->orWhere("date_approved", "like", "%" . $search . "%")
                     ->orWhere("company_name", "like", "%" . $search . "%")
                     ->orWhere("department_name", "like", "%" . $search . "%")
@@ -92,50 +93,6 @@ class OrderController extends Controller
         return GlobalFunction::response_function(Status::ORDER_DISPLAY, $order);
     }
 
-    // public function elixir_order(Request $request)
-    // {
-    //     $status = $request->input("status", "");
-    //     $from = $request->from;
-    //     $to = $request->to;
-    //     $date_today = Carbon::now()
-    //         ->timeZone("Asia/Manila")
-    //         ->format("Y-m-d");
-    //     $order = Transaction::with([
-    //         "orders" => function ($query) {
-    //             return $query->whereNull("deleted_at");
-    //         },
-    //     ])
-    //         ->whereNotNull("date_approved")
-    //         ->whereNull("deleted_at")
-    //         ->when(isset($request->from) && isset($request->to), function ($query) use (
-    //             $from,
-    //             $to
-    //         ) {
-    //             $query->where(function ($query) use ($from, $to) {
-    //                 $query
-    //                     ->whereDate("date_needed", ">=", $from)
-    //                     ->whereDate("date_needed", "<=", $to);
-    //             });
-    //         })
-    //         ->when($status === "today", function ($query) use ($date_today) {
-    //             $query->whereNotNull("date_approved")->whereDate("date_needed", $date_today);
-    //         })
-    //         ->when($status === "pending", function ($query) use ($date_today) {
-    //             $query->whereDate("date_needed", ">", $date_today)->whereNotNull("date_approved");
-    //         })
-    //         ->when($status === "all", function ($query) {
-    //             $query->whereNotNull("date_needed")->whereNotNull("date_approved");
-    //         })
-    //         ->orderByDesc("updated_at")
-    //         ->get();
-
-    //     if ($order->isEmpty()) {
-    //         return GlobalFunction::not_found(Status::NOT_FOUND);
-    //     }
-
-    //     return GlobalFunction::response_function(Status::ORDER_DISPLAY, $order);
-    // }
-
     public function show($id)
     {
         $order = Transaction::with("orders")
@@ -153,18 +110,21 @@ class OrderController extends Controller
     public function store(StoreRequest $request)
     {
         $user = Auth()->user();
+        $user_permission = Auth()->user()->role->access_permission;
+        $user_role = explode(", ", $user_permission);
 
         $transaction = Transaction::create([
-            "order_no" => $request["order_no"],
-
-            "date_needed" => date("Y-m-d", strtotime($request["date_needed"])),
             "date_ordered" => Carbon::now()
                 ->timeZone("Asia/Manila")
                 ->format("Y-m-d"),
-            "hri_customer" => $request["hri_customer"],
 
             "rush" => $request["rush"],
             "order_type" => "online",
+            "remarks" => $request["remarks"],
+
+            "keyword_id" => $request["keyword"]["id"],
+            "keyword_code" => $request["keyword"]["code"],
+            "keyword_name" => $request["keyword"]["name"],
 
             "company_id" => $request["company"]["id"],
             "company_code" => $request["company"]["code"],
@@ -197,24 +157,20 @@ class OrderController extends Controller
             "requestor_id" => $request["requestor"]["id"],
             "requestor_name" => $request["requestor"]["name"],
 
-            "date_approved" =>
-                $user->role_id == 5
-                    ? Carbon::now()
-                        ->timeZone("Asia/Manila")
-                        ->format("Y-m-d H:i:s")
-                    : null,
+            "date_approved" => in_array("approved", $user_role)
+                ? Carbon::now()
+                    ->timeZone("Asia/Manila")
+                    ->format("Y-m-d H:i:s")
+                : null,
 
-            "approver_id" => $user->role_id == 5 ? $user->id : null,
-            "approver_name" => $user->role_id == 5 ? $user->account_name : null,
+            "approver_id" => in_array("approved", $user_role) ? $user->id : null,
+            "approver_name" => in_array("approved", $user_role) ? $user->account_name : null,
         ]);
 
         foreach ($request->order as $key => $value) {
             Order::create([
                 "transaction_id" => $transaction->id,
                 "requestor_id" => $request["requestor"]["id"],
-
-                "order_no" => $request["order_no"],
-
                 "customer_code" => $request["customer"]["code"],
 
                 "material_id" => $request["order"][$key]["material"]["id"],
@@ -237,6 +193,7 @@ class OrderController extends Controller
 
     public function update(UpdateRequest $request, $id)
     {
+        $user = Auth()->user();
         $transaction = Transaction::find($id);
 
         $orders = $request->order;
@@ -246,8 +203,15 @@ class OrderController extends Controller
             ->whereNull("date_approved")
             ->get();
 
-        if ($invalid->isEmpty()) {
+        if ($invalid->isEmpty() && $user->role_id !== 5) {
             return GlobalFunction::invalid(Status::INVALID_UPDATE);
+        }
+
+        $invalid_update = $transaction->whereNull("date_served");
+        if (!$invalid_update && $user->role_id == 2) {
+            return GlobalFunction::invalid(Status::INVALID_UPDATE_SERVE);
+        } elseif (!$invalid_update && $user->role_id == 5) {
+            return GlobalFunction::invalid(Status::INVALID_UPDATE_SERVE);
         }
 
         $not_found = Transaction::where("id", $id)->get();
@@ -256,20 +220,22 @@ class OrderController extends Controller
         }
 
         $transaction->update([
-            "hri_customer" => $request["hri_customer"],
-
             "charge_company_id" => $request["charge_company"]["id"],
             "charge_company_code" => $request["charge_company"]["code"],
             "charge_company_name" => $request["charge_company"]["name"],
+            "remarks" => $request["remarks"],
+            "keyword_id" => $request["keyword"]["id"],
+            "keyword_code" => $request["keyword"]["code"],
+            "keyword_name" => $request["keyword"]["name"],
 
             "charge_department_id" => $request["charge_department"]["id"],
             "charge_department_code" => $request["charge_department"]["code"],
             "charge_department_name" => $request["charge_department"]["name"],
 
-            "charge_location_id" => $request["charge_location"]["id"],
+            "                                                                                                                                                                                                                                                  charge_location_id" =>
+                $request["charge_location"]["id"],
             "charge_location_code" => $request["charge_location"]["code"],
             "charge_location_name" => $request["charge_location"]["name"],
-            "rush" => $request["rush"],
             "date_needed" => date("Y-m-d", strtotime($request["date_needed"])),
         ]);
 
@@ -296,7 +262,6 @@ class OrderController extends Controller
                     "transaction_id" => $transaction["id"],
                     "requestor_id" => $transaction["requestor_id"],
 
-                    "order_no" => $request["order_no"],
                     "customer_code" => $request["customer"]["code"],
 
                     "material_id" => $value["material"]["id"],
@@ -346,6 +311,12 @@ class OrderController extends Controller
             ->get();
         if ($not_allowed->isEmpty()) {
             return GlobalFunction::denied(Status::ACCESS_DENIED);
+        }
+
+        $invalid_serve = $transaction->whereNull("date_served")->get();
+
+        if ($invalid_serve->isEmpty()) {
+            return GlobalFunction::invalid(Status::INVALID_UPDATE_SERVE);
         }
 
         $result = $transaction
@@ -424,29 +395,31 @@ class OrderController extends Controller
         );
     }
 
-    public function sms_order(Request $request)
+    public function sms_order_fa(Request $request)
     {
+        $requestor_id = current($request->results)["id"];
         $requestor_no = current($request->results)["from"];
         $content = current($request->results)["cleanText"];
-        // $keyword = current($request->results)["keyword"];
+        $keyword = current($request->results)["keyword"];
 
         $header = current(preg_split("/\\r\\n|\\r|\\n/", $content));
-        $validate_header = SmsFunction::validate_header($header, $requestor_no);
 
-        if (!empty($validate_header)) {
-            return SmsFunction::send($requestor_no, $validate_header);
-        }
+        $validate_header = SmsFunction::validate_header($header, $requestor_no);
+        // if (!empty($validate_header)) {
+        //     return SmsFunction::viber($requestor_id, $validate_header);
+        // }
 
         $body = explode("#", $content)[1];
-        $validate_body = SmsFunction::validate_body($header, $body, $requestor_no);
+        $validate_body = SmsFunction::validate_body($header, $body, $requestor_no, $keyword);
 
-        if (!empty($validate_body)) {
-            return SmsFunction::send($requestor_no, $validate_body);
-        }
+        // if (!empty($validate_body)) {
+        //     return SmsFunction::viber($requestor_id, $validate_body);
+        // }
 
-        return SmsFunction::save_sms_order($header, $body, $requestor_no);
+        return SmsFunction::save_sms_order($header, $body, $requestor_no, $requestor_id, $keyword);
         //    explode('',$header) ; for parameter Genus distri $keyword
     }
+
     public function sms_cancel(Request $request)
     {
         $requestor_no = current($request->results)["from"];

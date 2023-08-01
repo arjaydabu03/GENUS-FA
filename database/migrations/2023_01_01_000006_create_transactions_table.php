@@ -20,8 +20,11 @@ return new class extends Migration {
             $table->timestamp("date_approved")->nullable();
             $table->timestamp("date_served")->nullable();
             $table->string("order_type")->nullable();
+            $table->string("remarks")->nullable();
 
-            $table->string("hri_customer")->nullable();
+            $table->integer("keyword_id")->nullable();
+            $table->string("keyword_code")->nullable();
+            $table->string("keyword_name")->nullable();
 
             $table->integer("company_id");
             $table->string("company_code");

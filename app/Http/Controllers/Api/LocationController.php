@@ -14,6 +14,7 @@ class LocationController extends Controller
 {
     public function index(Request $request)
     {
+        // return $sample = Location::with("department")->get();
         $status = $request->status;
         $search = $request->search;
         $paginate = isset($request->paginate) ? $request->paginate : 1;

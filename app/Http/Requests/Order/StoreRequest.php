@@ -5,7 +5,7 @@ namespace App\Http\Requests\Order;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Carbon\carbon;
-use App\Models\Cutoff;
+use App\Models\User;
 class StoreRequest extends FormRequest
 {
     /**
@@ -25,23 +25,16 @@ class StoreRequest extends FormRequest
      */
     public function rules()
     {
-        $order_no = $this->input("order_no");
         $customer_code = $this->input("customer.code");
-
         $requestor_id = $this->user()->id;
 
         return [
-            "order_no" => [
-                "required",
-                Rule::unique("transactions", "order_no")
-                    ->where("requestor_id", $requestor_id)
-                    ->where(function ($query) {
-                        return $query->whereDate("date_ordered", date("Y-m-d"));
-                    })
-                    ->whereNull("deleted_at"),
-            ],
-            "date_needed" => "required",
             "rush" => "nullable",
+            "reason" => "nullable",
+
+            "keyword.id" => "required",
+            "keyword.code" => "required",
+            "keyword.name" => "required",
 
             "company.id" => "required",
             "company.code" => "required",
@@ -61,7 +54,7 @@ class StoreRequest extends FormRequest
             "customer.id" => "required",
             "customer.code" => "required",
             "customer.name" => "required",
-            
+
             "charge_company.id" => "required",
             "charge_company.code" => "required",
             "charge_company.name" => "required",
@@ -80,11 +73,9 @@ class StoreRequest extends FormRequest
                 "exists:materials,code,deleted_at,NULL",
                 Rule::unique("order", "material_code")->where(function ($query) use (
                     $customer_code,
-                    $order_no,
                     $requestor_id
                 ) {
                     return $query
-                        ->where("order_no", $order_no)
                         ->where("customer_code", $customer_code)
                         ->where("requestor_id", $requestor_id)
                         ->where(function ($query) {
@@ -109,7 +100,6 @@ class StoreRequest extends FormRequest
     public function attributes()
     {
         return [
-            "order_no" => "order no.",
             "order.*.material.code" => "material",
             "order.*.material.id" => "Item",
         ];
@@ -129,23 +119,18 @@ class StoreRequest extends FormRequest
             // $validator->errors()->add("custom", $this->user()->id);
             // $validator->errors()->add("custom", $this->route()->id);
             // $validator->errors()->add("custom", "STOP!");
-            $time_now = Carbon::now()
-                ->timezone("Asia/Manila")
-                ->format("H:i");
-            $date_today = Carbon::now()
-                ->timeZone("Asia/Manila")
-                ->format("Y-m-d");
-            $cutoff = date("H:i", strtotime(Cutoff::get()->value("time")));
 
-            $is_rush =
-                date("Y-m-d", strtotime($this->input("date_needed"))) == $date_today &&
-                $time_now > $cutoff;
+            // $user = Auth()->user();
 
-            $with_rush_remarks = !empty($this->input("rush"));
+            // $is_rush =
+            //     date("Y-m-d", strtotime($this->input("date_needed"))) == $date_today &&
+            //     $time_now > $cutoff;
 
-            if ($is_rush && !$with_rush_remarks) {
-                $validator->errors()->add("rush", "The rush field is required.");
-            }
+            // $with_rush_remarks = !empty($this->input("rush"));
+
+            // if ($is_rush && !$with_rush_remarks) {
+            //     $validator->errors()->add("rush", "The rush field is required.");
+            // }
         });
     }
 }

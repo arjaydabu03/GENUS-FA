@@ -25,11 +25,11 @@ class ImportRequest extends FormRequest
     public function rules()
     {
         return [
-            "*.code" => ["required", "string", "unique:materials,code", "distinct"],
+            "*.code" => ["required", "unique:materials,code", "distinct"],
             "*.name" => "required|string",
             "*.category" => "required|exists:categories,name,deleted_at,NULL",
             "*.uom" => "required|exists:uom,code,deleted_at,NULL",
-            "*.warehouse" => "required|exists:warehouse,name,deleted_at,NULL",
+            "*.additional_desc" => "required",
         ];
     }
 
@@ -39,7 +39,6 @@ class ImportRequest extends FormRequest
             "*.code" => "code",
             "*.category" => "category",
             "*.uom" => "uom",
-            "*.warehouse" => "warehouse",
         ];
     }
 

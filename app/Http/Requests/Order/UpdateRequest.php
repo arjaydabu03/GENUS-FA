@@ -35,22 +35,25 @@ class UpdateRequest extends FormRequest
         $requestor_role = $this->user()->role_id;
 
         return [
-            "order_no" => [
-                "required",
-                Rule::unique("transactions", "order_no")
-                    ->ignore($this->route("order"))
-                    ->when($requestor_role == 3, function ($query) use ($requestor_id) {
-                        return $query->where("requestor_id", $requestor_id);
-                    })
-                    // ->when($requestor_role == 2, function ($query) use ($requestor_id) {
-                    //     return $query->where("requestor_id", $requestor_id);
-                    // })
-                    ->where(function ($query) {
-                        return $query->whereDate("date_ordered", date("Y-m-d"));
-                    })
-                    ->whereNull("deleted_at"),
-            ],
-            "date_needed" => "required",
+            // "order_no" => [
+            //     "required",
+            //     Rule::unique("transactions", "order_no")
+            //         ->ignore($this->route("order"))
+            //         ->when(
+            //             $requestor_role == 3 || $requestor_role == 5 || $requestor_role == 1,
+            //             function ($query) use ($requestor_id) {
+            //                 return $query->where("requestor_id", $requestor_id);
+            //             }
+            //         )
+            //         // ->when($requestor_role == 2, function ($query) use ($requestor_id) {
+            //         //     return $query->where("requestor_id", $requestor_id);
+            //         // })
+            //         ->where(function ($query) {
+            //             return $query->whereDate("date_ordered", date("Y-m-d"));
+            //         })
+            //         ->whereNull("deleted_at"),
+            // ],
+            // "date_needed" => "required",
             "customer.id" => "required",
             "customer.code" => "required",
             "customer.name" => "required",
@@ -73,11 +76,9 @@ class UpdateRequest extends FormRequest
                 "exists:materials,code,deleted_at,NULL",
                 Rule::unique("order", "material_code")->where(function ($query) use (
                     $customer_code,
-                    $order_no,
                     $requestor_id
                 ) {
                     return $query
-                        ->where("order_no", $order_no)
                         ->where("customer_code", $customer_code)
                         ->where("requestor_id", $requestor_id)
                         ->where(function ($query) {

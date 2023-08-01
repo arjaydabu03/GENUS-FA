@@ -116,6 +116,7 @@ class UserController extends Controller
 
     public function store(UserRequest $request)
     {
+        
         $user = new User([
             "account_code" => $request["code"],
             "account_name" => $request["name"],

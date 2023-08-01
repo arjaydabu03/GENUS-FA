@@ -12,9 +12,9 @@ class Material extends Model
 
     protected $table = "materials";
 
-    protected $fillable = ["code", "name", "category_id", "uom_id", "warehouse_id"];
+    protected $fillable = ["code", "name", "category_id", "uom_id", "additional_desc"];
 
-    protected $hidden = ["category_id", "uom_id", "warehouse_id", "created_at", "deleted_at"];
+    protected $hidden = ["category_id", "uom_id", "created_at", "deleted_at"];
 
     public function category()
     {
@@ -27,13 +27,6 @@ class Material extends Model
     {
         return $this->belongsTo(UOM::class)
             ->select("id", "code", "description", "deleted_at")
-            ->withTrashed();
-    }
-
-    public function warehouse()
-    {
-        return $this->belongsTo(Warehouse::class)
-            ->select("id", "code", "name", "deleted_at")
             ->withTrashed();
     }
 }

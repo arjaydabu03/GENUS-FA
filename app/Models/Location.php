@@ -18,11 +18,15 @@ class Location extends Model
     {
         return $this->belongsToMany(
             Department::class,
-            "location_department",
+            "location_departments",
             "location_id",
             "department_id",
             "sync_id",
             "sync_id"
         );
     }
+    // public function department()
+    // {
+    //     return $this->belongsToMany(Department::class");
+    // }
 }

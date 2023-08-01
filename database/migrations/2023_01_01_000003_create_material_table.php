@@ -29,11 +29,7 @@ return new class extends Migration {
                 ->references("id")
                 ->on("uom");
 
-            $table->unsignedInteger("warehouse_id")->index();
-            $table
-                ->foreign("warehouse_id")
-                ->references("id")
-                ->on("warehouse");
+            $table->string("additional_desc");
 
             $table->timestamps();
             $table->softDeletes();

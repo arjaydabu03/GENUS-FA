@@ -25,9 +25,9 @@ class MaterialController extends Controller
         $rows = $request->input("rows", 10);
         $paginate = $request->input("paginate", 1);
 
-        $material = Material::with("category", "uom", "warehouse")
+        $material = Material::with("category", "uom")
 
-            ->select("id", "code", "name", "category_id", "uom_id", "warehouse_id")
+            ->select("id", "code", "name", "category_id", "uom_id", "additional_desc")
             ->when($paginate, function ($query) {
                 $query->select(
                     "id",
@@ -35,7 +35,7 @@ class MaterialController extends Controller
                     "name",
                     "category_id",
                     "uom_id",
-                    "warehouse_id",
+                    "additional_desc",
                     "updated_at"
                 );
             })
@@ -45,7 +45,8 @@ class MaterialController extends Controller
             ->when($search, function ($query) use ($search) {
                 $query
                     ->where("code", "like", "%" . $search . "%")
-                    ->orWhere("name", "like", "%" . $search . "%");
+                    ->orWhere("name", "like", "%" . $search . "%")
+                    ->orWhere("additional_desc", "like", "%" . $search . "%");
             });
 
         $material = $paginate
@@ -76,15 +77,11 @@ class MaterialController extends Controller
         $material = Material::create([
             "code" => $request["code"],
             "name" => $request["name"],
-            "cip_no" => $request["cip_no"],
-            "helpdesk_no" => $request["helpdesk_no"],
             "category_id" => $request["category_id"],
             "uom_id" => $request["uom_id"],
-            "warehouse_id" => $request["warehouse_id"],
+            "additional_desc" => $request["additional_desc"],
         ]);
-        $material = $material
-            ->with("category", "uom", "warehouse")
-            ->firstWhere("id", $material->id);
+        $material = $material->with("category", "uom")->firstWhere("id", $material->id);
         return GlobalFunction::save(Status::MATERIAL_SAVE, $material);
     }
 
@@ -101,11 +98,9 @@ class MaterialController extends Controller
         $material->update([
             "code" => $request["code"],
             "name" => $request["name"],
-            "cip_no" => $request["cip_no"],
-            "helpdesk_no" => $request["helpdesk_no"],
             "category_id" => $request["category_id"],
             "uom_id" => $request["uom_id"],
-            "warehouse_id" => $request["warehouse_id"],
+            "additional_desc" => $request["additional_desc"],
         ]);
 
         $material = $material->with("category", "uom")->firstWhere("id", $material->id);
@@ -152,20 +147,18 @@ class MaterialController extends Controller
             $name = $file_import["name"];
             $uom = $file_import["uom"];
             $category = $file_import["category"];
-            $warehouse = $file_import["warehouse"];
+            $additional_desc = $file_import["additional_desc"];
 
             $category_id = Category::where("name", $category)->first();
 
             $uom_id = UOM::where("code", $uom)->first();
-
-            $warehouse_id = Warehouse::where("name", $warehouse)->first();
 
             $material = Material::create([
                 "code" => $code,
                 "name" => $name,
                 "category_id" => $category_id->id,
                 "uom_id" => $uom_id->id,
-                "warehouse_id" => $warehouse_id->id,
+                "additional_desc" => $additional_desc,
             ]);
         }
         return GlobalFunction::save(

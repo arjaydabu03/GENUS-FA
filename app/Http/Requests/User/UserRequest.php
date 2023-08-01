@@ -47,9 +47,11 @@ class UserRequest extends FormRequest
             "scope_order" => ["required_if:role_id,3", "array"],
             "role_id" => "required|exists:role,id,deleted_at,NULL",
             "mobile_no" => [
-                "required",
+                "required_if:role_id,7",
+                "exclude_unless:role_id,7",
                 "regex:[63]",
                 "digits:12",
+
                 $this->route()->id
                     ? "unique:users,mobile_no," . $this->route()->id
                     : "unique:users,mobile_no",
@@ -84,6 +86,20 @@ class UserRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             // $validator->errors()->add("custom", "STOP!");
+            // $validator->errors()->add("custom", $this->route()->id);
+
+            // $user = Auth()->user();
+            // $user_permission = Auth()->user()->role->access_permission;
+            // $user_role = explode(", ", $user_permission);
+
+            // $valdate_role = in_array("sms", $user_role);
+
+            // $mobile = !empty($this->input("mobile_no"));
+
+            // if ($valdate_role && !$mobile) {
+            //     $validator->errors()->add("mobile_no", "The mobile no is required. ");
+            // }
+
             // $validator->errors()->add("custom", $this->route()->id);
         });
     }
