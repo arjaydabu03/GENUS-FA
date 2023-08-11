@@ -168,6 +168,10 @@ class ApproverController extends Controller
             ->with("scope_approval")
             ->first()
             ->scope_approval->pluck("location_id");
+        $user_scope_code = User::where("id", Auth::id())
+            ->with("scope_approval")
+            ->first()
+            ->scope_approval->pluck("location_code");
 
         $transaction = Transaction::where("id", $id);
 
@@ -176,7 +180,10 @@ class ApproverController extends Controller
             return GlobalFunction::not_found(Status::NOT_FOUND);
         }
 
-        $not_allowed = $transaction->whereIn("department_id", $user_scope)->get();
+        $not_allowed = $transaction
+            ->whereIn("customer_id", $user_scope)
+            ->whereIn("customer_code", $user_scope_code)
+            ->get();
         if ($not_allowed->isEmpty()) {
             return GlobalFunction::denied(Status::ACCESS_DENIED);
         }
